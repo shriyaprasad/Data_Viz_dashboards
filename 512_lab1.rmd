@@ -1,0 +1,268 @@
+---
+title: "ANLY 512 - Lab 1"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    social: menu
+    source: embed
+    html_document:
+    df_print: paged
+    pdf_document: default
+date: "2023-01-27"
+author: 'Shriya Prasad'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Table of Contents {.sidebar}
+
+* Introduction and Overview
+
+* Metrics and Key Indicators
+  
+* Companies Stocks Performances Detail
+
+* Individual Stock Analysis 
+    ** Facet Chart
+    ** Candlestick Charts
+
+* Conclusion
+
+# **Introduction and Overview**
+
+Row {data-height=230}
+-------------------------------------
+    
+### **Overview** 
+Due to the inherent growth in the electronic production and storage of information, there is often a feeling of “information overload” or inundation when facing the process of quantitative decision making. As an analyst your job will often be to conduct analyses or create tools to support quantitative decision making.
+
+A principle tool used in industry, goverment, non-profits, and academic fields to compensate for the information overload is the information dashboard. Functionally, a dashboard is meant to provide a user with a central resource to present in a clear and concise manner all the information neccessary to support day-to-day decision making and support operations.
+
+Row
+-------------------------------------
+    
+### **Objective** 
+
+The objective of this laboratory is to plan, design, and create an information dashboard to support quantitative decision making. To accomplish this task you will have to complete a number of steps:
+
+Delineate the necessary decision (I will do that below).
+Identify what information will be relevant to decision making.
+Find and collect the data necessary to create your visualization plan.
+Organize and summarize the collected data.
+Design and create the best visualizations to present that information.
+Finally organize the layout of those visualizations in a way that conforms to the theory of dashboarding.
+Write a summary about what decisions you made based on the visualizations that you developed.
+
+### **The Decision & Rules**
+
+You make investments for an organization, your objective is to purchase securities/commodities for the key objective of maximizing profits. You want to make an investment in securities/commodities to make some short term gains. You are considering investing in one of any four companies, for example: Twitter (TWTR), Microsoft (MSFT), or Apple (AAPL) (don’t use these). Choose 4 companies, commodities or any financial instrument you like, and determine which one of the four will produce the most short term gains. Use your imagination.
+
+# **Metrics and Key Indicators**
+Row
+-------------------------
+
+### **Financial Indicators/Metrics**
+
++ `r kableExtra::text_spec("**P-E Ratio**", color = "#5c5c5c")` - It is the ratio of a company's share price to the company's earnings per share. This ratio is used for valuing companies and to find out whether they are overvalued or undervalued.
++ `r kableExtra::text_spec("**EPS**", color = "#5c5c5c")` - It is the portion of a company's profit that is allocated to every individual share of the stock and helps in understanding the financial strength of a company
++ `r kableExtra::text_spec("**Dividend Yield Ratio**", color = "#5c5c5c")` - is a financial ratio that shows how much a company pays out in dividends each year relative to its stock price.
++ `r kableExtra::text_spec("**Market Cap**", color = "#5c5c5c")` - the total value of a company's shares.
+
+### **Key Indicator Analysis** 
+
+
+```{r, echo=FALSE}
+library(plyr)
+library(DT)
+library(tidyverse)
+library(tidyquant)
+library(dplyr)
+library(highcharter)
+library(viridisLite)
+library(ggplot2)
+library(broom)
+library(xts)
+library(zoo)
+library(flexdashboard)
+library(kableExtra)
+library(dygraphs)
+
+what_metrics <- yahooQF(c("Price/Sales", 
+                          "P/E Ratio",
+                          "Price/EPS Estimate Next Year",
+                          "PEG Ratio",
+                          "Dividend Yield", 
+                          "Market Capitalization"))
+tickers <- c("BBBY", "WMT", "AMZN", "TGT")
+metrics <- getQuote(paste(tickers, sep = ",", collapse = ";"), what = what_metrics)
+metrics <- data.frame(Symbol = tickers, metrics[,2:length(metrics)])
+
+colnames(metrics) <- c("Symbol", "P-E Ratio", "EPS", "Dividend Yield Ratio", "Market Cap")
+DT::datatable(metrics)
+```
+
+# **Analysis - Facet Chart**
+
+## Column {data-height=900 .tabset .tabset-fade}
+
+```{r, echo=FALSE}
+start <- as.Date("2022-1-01") 
+end <- as.Date("2023-1-1")
+
+x = getSymbols(tickers, src = "yahoo", from = start, to = end)
+stocks = as.xts(data.frame(A = BBBY[, "BBBY.Adjusted"], 
+B = WMT[, "WMT.Adjusted"], C = AMZN[, "AMZN.Adjusted"], 
+E = TGT[,"TGT.Adjusted"]))
+```
+### **Overall Daily Trend**  {data-width=900}
+
+``` {r, echo=FALSE}
+names(stocks) <- c("BBBY", "WMT", "AMZN","TGT")
+index(stocks) <- as.Date(index(stocks))
+
+stocks_series <- tidy(stocks) %>% 
+  ggplot(aes(x=index,y=value, color=series)) +
+  labs(title = "Daily Stock Adjusted Prices Comparison from 01/2022~01/2023",
+       
+       subtitle = "Bed Bath and Beyond, Walmart, Amazon, Target",
+       caption = "Source: Yahoo Finance",
+       color = "Stock",
+       x = "Date",
+       y = "End of day Adjusted Price ($)") +
+  scale_color_manual(values = c("Red", "Green", "DarkBlue","Orange"))+
+  geom_line()
+
+stocks_series
+```
+
+### **Facet Chart ** {data-width=900}
+
+```{r, echo=FALSE}
+stocks_series2 = tidy(stocks) %>% 
+  
+  ggplot(aes(x=index,y=value, color=series)) + 
+  geom_line() +
+  facet_grid(series~.,scales = "free") + 
+  labs(title = "Daily Stock Adjusted Prices Comparison from 01~09/2022",
+       
+       subtitle = "Among Bed Bath and Beyond, Walmart, Amazon, Target",
+       caption = "Source: Yahoo Finance",
+       color = "Stock",
+       x = "Date",
+       y = "End of day Adjusted Price ($)") +
+  scale_color_manual(values = c("Red", "Green", "DarkBlue","Orange"))
+stocks_series2
+```
+
+# **Analysis - Candlestick Chart**
+
+## Column {data-height=900 .tabset .tabset-fade}
+
+``` {r, echo =FALSE}
+library(xts)
+# Configuring settings as per tidyquant tutorial
+options("getSymbols.warning4.0"=FALSE)
+options("getSymbols.yahoo.warning"=FALSE)
+
+# The function
+candleStick_plot<-function(symbol,from,to){
+  tq_get(symbol,
+        from = from,
+        to = to,
+        warnings = FALSE) %>% 
+    mutate(greenRed=ifelse(open-close>0,
+                           "Red",
+                           "Green")) %>% 
+    ggplot()+
+    geom_segment(aes(x = date,
+                     xend=date,
+                     y =open,
+                     yend =close,
+                     colour=greenRed),
+                 linewidth=3)+
+    theme_tq()+
+    geom_segment(aes(x = date,
+                     xend=date,
+                     y =high,
+                     yend =low,
+                     colour=greenRed))+
+    scale_color_manual(values=c("Forest Green","Red"))+
+    ggtitle(paste0(symbol," (",from," - ",to,")"))+
+    labs(y = "Price ($)",
+        x = "Date") +
+    theme(legend.position ="none",
+          axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+          plot.title= element_text(hjust=0.5))
+}
+
+```
+
+### **BBBY** 
+
+``` {r, echo =FALSE}
+candleStick_plot("BBBY",from = start,to = end)
+```
+
+### **WMT** 
+
+``` {r, echo =FALSE}
+candleStick_plot("WMT",from = start,to = end)
+```
+
+### **AMZN**
+
+``` {r, echo =FALSE}
+candleStick_plot("AMZN",from = start,to = end)
+```
+
+### **TGT** 
+
+``` {r, echo =FALSE}
+candleStick_plot("TGT",from = start,to = end)
+```
+
+## Column {data-height=900 .tabset .tabset-fade}
+
+# **Monthly Returns**
+
+```{r, echo=FALSE}
+BBBYmr <- monthlyReturn(BBBY)
+WMTmr <- monthlyReturn(WMT)
+AMZNmr <- monthlyReturn(AMZN)
+TGTmr <- monthlyReturn(TGT)
+
+mg.return <- merge.xts(BBBYmr, WMTmr, AMZNmr, TGTmr)
+colnames(mg.return) <- c("BedBathBeyond", "Walmart", "Amazon", "Target")
+
+dygraph(mg.return, main = "Monthly Return") %>%
+  dyAxis("y", label = "Return") %>%
+  dyOptions(colors = RColorBrewer::brewer.pal(4, "Dark2")) %>%
+  dyHighlight(highlightSeriesBackgroundAlpha = 0.3,
+              highlightSeriesOpts = list(strokeWidth = 3)) %>%
+  dyRangeSelector(height = 30)
+```
+
+# **Conclusion**
+
+Row
+-------------------------
+
+### **Key Indicators Analysis**
+By analyzing key indicators such as “P/E Ratio”, “Price/EPS Estimate Next Year”, "Dividend Yield" and “Market Capitalization” to compare four different companies (Bed Bath and Beyond, Walmart, Amazon, and Target) performance from January 1, 2022 to January 1, 2023, we can see:
+
++ `r kableExtra::text_spec("**P-E Ratio**", color = "#5c5c5c")` - Amazon (AMZN) has the highest P-E Ratio (89.38), which means that investors are expecting higher earnings growth in the future, then followed by Walmart (43.75). 
+
++ `r kableExtra::text_spec("**EPS**", color = "#5c5c5c")` - According to EPS, Amazon (AMZN) is again the highest one with 61.62, which indicates how much money a company made per share of its stock, followed by Walmart (21.74), Target (17.73) and Bed Bath and Beyond (-0.33). 
+
++ `r kableExtra::text_spec("**Dividend Yield**", color = "#5c5c5c")` - Based on dividend yield, we see that Amazon and Bed Bath and Beyond have 0 yeild, while Target and Walmart have had 1.5% and 2.3% respectively. 
+
++ `r kableExtra::text_spec("**Market Cap**", color = "#5c5c5c")` - From the market capitalization perspective, it is better to invest in Target and Walmart when we also consider Earnings per share and the Dividends.
+
+
+### **Individual Trends Analysis**
+Based on the daily Stock adjusted prices chart and their individual candlestick chart, we can see clearly that the year of 2022 was not great for any of the companies, and they suffered bad. But, Bed bath and beyond has had the worst downturn of its stock prices.  All the companies had a massive dip in their stock around the second Quarter od 2022. Walmart stock price has  recovered well, and we see small improvements for Target. Amazon is trying to keep it steady and Bed Bath and Beyond continues to see a decline. It is not recommended to invest in Bed Bath and Beyond.
+
+
